@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <AdditionalFiles Include="../../stylecop.json" />
+  </ItemGroup>
+
+  <!-- GameNetworkingSockets -->
+  <ItemGroup>
+    <Content Include="../../build/bin/GameNetworkingSockets.dll;../../build/bin/abseil_dll.dll;../../build/bin/libcrypto-3-x64.dll;../../build/bin/libprotobuf.dll"
+             Condition=" '$(OS)' == 'Windows_NT' ">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- ValveSocket-CSharp -->
+  <ItemGroup>
+    <Compile Include="../../ValveSockets-CSharp/ValveSockets.cs" />
+  </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants Condition="'$(OS)' == 'Unix'">VALVE_CALLBACK_PACK_SMALL</DefineConstants>
+    <DefineConstants Condition="'$(OS)' != 'Unix'">VALVE_CALLBACK_PACK_LARGE</DefineConstants>
+    <DefineConstants>$(DefineConstants);VALVESOCKETS_SPAN</DefineConstants>
+  </PropertyGroup>
+
+</Project>

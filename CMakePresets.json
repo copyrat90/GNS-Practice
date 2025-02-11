@@ -1,0 +1,18 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "gns-prac-base",
+            "binaryDir": "build",
+            "generator": "Ninja"
+        },
+        {
+            "name": "gns-prac-msvc",
+            "inherits": "gns-prac-base",
+            "cacheVariables": {
+                "CMAKE_C_FLAGS": "/utf-8",
+                "CMAKE_CXX_FLAGS": "/utf-8"
+            }
+        }
+    ]
+}

@@ -1,0 +1,3 @@
+
+add_executable(st_chat_server st_chat_server.cpp)
+target_link_libraries(st_chat_server GameNetworkingSockets::shared)

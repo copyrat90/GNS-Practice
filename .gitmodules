@@ -1,0 +1,6 @@
+[submodule "GameNetworkingSockets"]
+	path = GameNetworkingSockets
+	url = https://github.com/ValveSoftware/GameNetworkingSockets.git
+[submodule "ValveSockets-CSharp"]
+	path = ValveSockets-CSharp
+	url = https://github.com/copyrat90/ValveSockets-CSharp.git
