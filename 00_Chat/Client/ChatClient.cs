@@ -77,7 +77,7 @@ internal class ChatClient
         CancellationTokenSource cancelTokenSrc = new();
         CancellationToken cancelToken = cancelTokenSrc.Token;
 
-        void OnConnectionStatusChanged(ref StatusInfo info)
+        void OnConnectionStatusChanged(ref ConnectionStatusChangedInfo info)
         {
             switch (info.connectionInfo.state)
             {
@@ -101,13 +101,11 @@ internal class ChatClient
             }
         }
 
-        // Setup the server's connection status changed callback
-        // (Looks like ValveSockets-CSharp only exposes setter for global status callback?)
-        NetworkingUtils utils = new();
-        utils.SetStatusCallback(OnConnectionStatusChanged);
+        var clientConfigs = new Valve.Sockets.Configuration[1];
+        clientConfigs[0].SetConnectionStatusChangedCallback(OnConnectionStatusChanged);
 
         // Connect to server
-        uint connection = client.Connect(ref address);
+        uint connection = client.Connect(ref address, clientConfigs);
 
         void OnMessage(in NetworkingMessage netMsg)
         {

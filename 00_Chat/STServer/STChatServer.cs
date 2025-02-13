@@ -64,7 +64,7 @@ internal class STChatServer
         Dictionary<uint, ClientInfo> clients = [];
 
         // The connection status changed callback method
-        void OnConnectionStatusChanged(ref StatusInfo info)
+        void OnConnectionStatusChanged(ref ConnectionStatusChangedInfo info)
         {
             switch (info.connectionInfo.state)
             {
@@ -136,15 +136,14 @@ internal class STChatServer
             }
         }
 
-        // Setup the server's connection status changed callback
-        // (Looks like ValveSockets-CSharp only exposes setter for global status callback?)
-        NetworkingUtils utils = new();
-        utils.SetStatusCallback(OnConnectionStatusChanged);
+        // Setup configuration used for listen socket
+        var listenSocketConfigs = new Valve.Sockets.Configuration[1];
+        listenSocketConfigs[0].SetConnectionStatusChangedCallback(OnConnectionStatusChanged);
 
         // Start listening
         Address addr = default;
         addr.SetAddress("::", port);
-        uint listenSocket = server.CreateListenSocket(ref addr);
+        uint listenSocket = server.CreateListenSocket(ref addr, listenSocketConfigs);
 
         // The message callback method
         void OnMessage(in NetworkingMessage netMsg)
