@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: 0BSD
 
+namespace GNSPrac.Chat;
+
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using ProtoBuf;
 using Valve.Sockets;
 
 /// <summary>
@@ -106,6 +109,8 @@ internal class STChatServer
                         Console.WriteLine($"Failed to assign poll group");
                     }
 
+                    Console.WriteLine($"New client #{info.connection} connected!");
+
                     break;
 
                 case ConnectionState.ClosedByPeer:
@@ -148,44 +153,96 @@ internal class STChatServer
         // The message callback method
         void OnMessage(in NetworkingMessage netMsg)
         {
-            // Ignore empty message.
+            // Ignore the empty message.
             // In this case, `netMsg.data` is nullptr
             if (netMsg.length == 0)
             {
+                Console.WriteLine("Client sent an empty message");
                 return;
             }
 
-            // Unmarshall the unmanaged string
-            string message = Marshal.PtrToStringUTF8(netMsg.data, netMsg.length)!;
+            // Unmarshall the unmanaged message
+            ChatProtocol msg;
+            unsafe
+            {
+                ReadOnlySpan<byte> msgRaw = new((void*)netMsg.data, netMsg.length);
+                msg = ProtoBuf.Serializer.Deserialize<ChatProtocol>(msgRaw);
+            }
 
             // Get the client from `clients` dictionary.
             // It must exist in the dictionary, because we added it on `ConnectionState.Connecting`
             ClientInfo client = clients[netMsg.connection];
 
-            // If this client has a name (logged-in client)
-            if (client.Name != null)
+            // Handle the message based on its type
+            switch (msg.Type)
             {
-                // Client sent a chat message, we need to propagate it to other clients.
-
-                // Prepare the chat message to send.
-                message = $"{client.Name}: {message}";
-                byte[] messageRaw = Encoding.UTF8.GetBytes(message);
-
-                // Propagate the chat message to other clients
-                foreach (var otherClientConn in clients.Keys)
-                {
-                    // Ignore itself
-                    if (otherClientConn != netMsg.connection)
+                case ChatProtocol.MsgType.MsgTypeChat:
                     {
-                        server.SendMessageToConnection(otherClientConn, messageRaw, SendFlags.Reliable | SendFlags.NoNagle);
+                        // We could reuse the same `msg`, but we'll just create another one to demonstrate.
+                        ChatProtocol response = new()
+                        {
+                            Type = ChatProtocol.MsgType.MsgTypeChat,
+                            Chat = new()
+                            {
+                                SenderName = client.Name ?? $"Guest#{netMsg.connection}",
+                                Content = msg.Chat.Content,
+                            },
+                        };
+
+                        // Serialize the response to a memory stream.
+                        // In real use case, you would get this from a pool.
+                        MemoryStream responseMS = new();
+                        ProtoBuf.Serializer.Serialize(responseMS, response);
+
+                        // Propagate the response to other clients.
+                        foreach (var otherClientConn in clients.Keys)
+                        {
+                            // Ignore itself
+                            if (otherClientConn != netMsg.connection)
+                            {
+                                server.SendMessageToConnection(otherClientConn, responseMS.GetBuffer(), Convert.ToInt32(responseMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
+                            }
+                        }
+
+                        // Print the chat message on the server side, too.
+                        Console.WriteLine($"{response.Chat.SenderName}: {response.Chat.Content}");
+                        break;
                     }
-                }
-            }
-            else
-            {
-                // If this client doesn't have a name yet, this is a login message.
-                // In that case, `message` is their name.
-                client.Name = message;
+
+                case ChatProtocol.MsgType.MsgTypeNameChange:
+                    {
+                        // Set the new name if not null
+                        if (msg.NameChange.Name != null)
+                        {
+                            client.Name = msg.NameChange.Name;
+                            Console.WriteLine($"Client #{netMsg.connection} changed their name to {client.Name}");
+                        }
+
+                        // Prepare the response to the client about their current name
+                        ChatProtocol response = new()
+                        {
+                            Type = ChatProtocol.MsgType.MsgTypeChat,
+                            Chat = new()
+                            {
+                                SenderName = "Server",
+                                Content = $"Your name is now {client.Name ?? $"Guest#{netMsg.connection}"}",
+                            },
+                        };
+
+                        // Serialize the response to a memory stream.
+                        // In real use case, you would get this from a pool.
+                        MemoryStream responseMS = new();
+                        ProtoBuf.Serializer.Serialize(responseMS, response);
+
+                        // Notify to the client about their current name
+                        server.SendMessageToConnection(netMsg.connection, responseMS.GetBuffer(), Convert.ToInt32(responseMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
+                        break;
+                    }
+
+                default:
+                    // Client shouldn't send other type of messages
+                    Console.WriteLine($"Client sent an invalid message type: {msg.Type}");
+                    break;
             }
         }
 
@@ -204,7 +261,7 @@ internal class STChatServer
             }
         });
 
-        Console.WriteLine("Server started, type 'quit' to quit");
+        Console.WriteLine("Server started, type /quit to quit");
 
         // User input loop
         while (true)
@@ -216,7 +273,7 @@ internal class STChatServer
                 continue;
             }
 
-            if (message == "quit")
+            if (message == "/quit")
             {
                 break;
             }
@@ -229,13 +286,24 @@ internal class STChatServer
 
         Console.WriteLine("Closing connections...");
 
+        // Prepare the final message from the server
+        ChatProtocol finalMsg = new()
+        {
+            Type = ChatProtocol.MsgType.MsgTypeChat,
+            Chat = new()
+            {
+                SenderName = "Server",
+                Content = "Server is shutting down. Goodbye.",
+            },
+        };
+        MemoryStream finalMsgMS = new();
+        ProtoBuf.Serializer.Serialize(finalMsgMS, finalMsg);
+
         // Close all the connections
-        string closeMessage = "Server is shutting down. Goodbye.";
-        byte[] closeMessageRaw = Encoding.UTF8.GetBytes(closeMessage);
         foreach (uint clientConn in clients.Keys)
         {
             // Send the final message
-            server.SendMessageToConnection(clientConn, closeMessageRaw, SendFlags.Reliable | SendFlags.NoNagle);
+            server.SendMessageToConnection(clientConn, finalMsgMS.GetBuffer(), Convert.ToInt32(finalMsgMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
 
             // Close the connection with linger enabled
             server.CloseConnection(clientConn, 0, "Server shutdown", true);

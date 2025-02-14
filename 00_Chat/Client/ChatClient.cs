@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: 0BSD
 
+using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using GNSPrac.Chat;
 using Valve.Sockets;
 
 /// <summary>
@@ -44,7 +46,7 @@ internal class ChatClient
         }
 
         Console.WriteLine($"Server IP: {addr}, Port: {port}");
-        Console.WriteLine("Type 'quit' to quit.");
+        Console.WriteLine("Type /quit to quit.");
         Console.WriteLine();
 
         try
@@ -87,7 +89,7 @@ internal class ChatClient
                     break;
 
                 case ConnectionState.Connected:
-                    Console.WriteLine("Successfully connected to server!\nType your first message, which will be your name.");
+                    Console.WriteLine("Successfully connected to server!\nTo change your name, type /name <your new name>.");
                     break;
 
                 case ConnectionState.ClosedByPeer:
@@ -109,11 +111,35 @@ internal class ChatClient
 
         void OnMessage(in NetworkingMessage netMsg)
         {
-            // Unmarshall the unmanaged string
-            string message = Marshal.PtrToStringUTF8(netMsg.data, netMsg.length)!;
+            // Ignore the empty message.
+            // In this case, `netMsg.data` is nullptr
+            if (netMsg.length == 0)
+            {
+                Console.WriteLine("Server sent an empty message");
+                return;
+            }
 
-            // Print the chat message
-            Console.WriteLine(message);
+            // Unmarshall the unmanaged string
+            ChatProtocol msg;
+            unsafe
+            {
+                ReadOnlySpan<byte> msgRaw = new((void*)netMsg.data, netMsg.length);
+                msg = ProtoBuf.Serializer.Deserialize<ChatProtocol>(msgRaw);
+            }
+
+            // Handle the message based on its type
+            switch (msg.Type)
+            {
+                case ChatProtocol.MsgType.MsgTypeChat:
+                    // Print the chat message
+                    Console.WriteLine($"{msg.Chat.SenderName ?? "???"}: {msg.Chat.Content ?? string.Empty}");
+                    break;
+
+                default:
+                    // Server shouldn't send other type of messages
+                    Console.WriteLine($"Server sent an invalid message type: {msg.Type}");
+                    break;
+            }
         }
 
         // Receive loop
@@ -137,13 +163,52 @@ internal class ChatClient
                 continue;
             }
 
-            if (message == "quit")
+            if (message == "/quit")
             {
                 break;
             }
 
-            byte[] messageRaw = Encoding.UTF8.GetBytes(message);
-            client.SendMessageToConnection(connection, messageRaw, SendFlags.Reliable | SendFlags.NoNagle);
+            ChatProtocol? msg;
+
+            // If the user requested a new name
+            string[] split = message.Split();
+            if (split.Length > 0 && split[0] == "/name")
+            {
+                if (split.Length < 2)
+                {
+                    Console.WriteLine("You should provide a new name after /name");
+                    continue;
+                }
+                else
+                {
+                    // Prepare new name
+                    string newName = string.Join(' ', split[1..]);
+                    msg = new()
+                    {
+                        Type = ChatProtocol.MsgType.MsgTypeNameChange,
+                        NameChange = new() { Name = newName },
+                    };
+                }
+            }
+
+            // If the user typed a chat message
+            else
+            {
+                // Prepare chat message
+                msg = new()
+                {
+                    Type = ChatProtocol.MsgType.MsgTypeChat,
+                    Chat = new() { Content = message },
+                };
+            }
+
+            // Serialize the `msg` to a memory stream.
+            // In real use case, you would get this from a pool.
+            MemoryStream msgMS = new();
+            ProtoBuf.Serializer.Serialize(msgMS, msg);
+
+            // Send the message
+            client.SendMessageToConnection(connection, msgMS.GetBuffer(), Convert.ToInt32(msgMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
         }
 
         Console.WriteLine("Quiting...");
