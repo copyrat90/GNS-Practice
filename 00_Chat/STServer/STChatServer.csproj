@@ -27,6 +27,9 @@
     <Content Include="../../build/bin/GameNetworkingSockets.dll;../../build/bin/abseil_dll.dll;../../build/bin/libcrypto-3-x64.dll;../../build/bin/libprotobuf.dll" Condition=" '$(OS)' == 'Windows_NT' ">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="../../build/bin/libGameNetworkingSockets.so" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <!-- Valve.Sockets.AutoGen -->

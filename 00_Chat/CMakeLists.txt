@@ -1,3 +1,3 @@
 
-add_subdirectory(Server)
+add_subdirectory(STServer)
 add_subdirectory(Client)

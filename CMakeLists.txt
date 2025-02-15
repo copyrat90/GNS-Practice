@@ -7,4 +7,4 @@ set(CMAKE_CXX_EXTENSIONS FALSE)
 
 add_subdirectory(GameNetworkingSockets)
 
-add_subdirectory(00_STChat)
+add_subdirectory(00_Chat)
