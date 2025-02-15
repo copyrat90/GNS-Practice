@@ -10,8 +10,8 @@
             "name": "gns-prac-msvc",
             "inherits": "gns-prac-base",
             "cacheVariables": {
-                "CMAKE_C_FLAGS": "/utf-8",
-                "CMAKE_CXX_FLAGS": "/utf-8"
+                "CMAKE_C_FLAGS": "/source-charset:utf-8",
+                "CMAKE_CXX_FLAGS": "/source-charset:utf-8"
             }
         }
     ]

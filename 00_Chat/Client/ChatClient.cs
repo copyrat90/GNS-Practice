@@ -2,6 +2,7 @@
 
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,7 +21,7 @@ internal class ChatClient
     private static async Task Main(string[] args)
     {
         Console.WriteLine("GNS-Practice #00: Chat");
-        Console.WriteLine("Chat client in C# with ValveSockets-CSharp");
+        Console.WriteLine("Chat client in C# with Valve.Sockets.AutoGen");
         Console.WriteLine();
 
         // Parse IP address & port from `args`
@@ -61,59 +62,80 @@ internal class ChatClient
             return;
         }
 
-        // Initialize `ValveSockets-CSharp`
-        if (!Valve.Sockets.Library.Initialize())
+        // Initialize `Valve.Sockets.AutoGen`
+        GameNetworkingSockets gns;
+        try
         {
-            Console.WriteLine("Failed to initialize ValveSocket-CSharp");
+            gns = new GameNetworkingSockets();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
             return;
         }
 
         // Setup the address
-        Address address = default;
-        address.SetAddress(addr.ToString(), port);
+        SteamNetworkingIPAddr address = default;
+        address.SetIPv6(addr.MapToIPv6().GetAddressBytes(), port);
 
         // Prepare socket
-        NetworkingSockets client = new();
+        SteamNetworkingSockets client = new();
 
         // CancellationToken to stop the receive loop
         CancellationTokenSource cancelTokenSrc = new();
         CancellationToken cancelToken = cancelTokenSrc.Token;
 
-        void OnConnectionStatusChanged(ref ConnectionStatusChangedInfo info)
+        FnSteamNetConnectionStatusChanged onConnStatsChanged;
+
+        unsafe
         {
-            switch (info.connectionInfo.state)
+            onConnStatsChanged = (ref SteamNetConnectionStatusChangedCallback info) =>
             {
-                case ConnectionState.None:
-                    // This is when you destroy the connection.
-                    // Nothing to do here.
-                    break;
+                switch (info.m_info.m_eState)
+                {
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_None:
+                        // This is when you destroy the connection.
+                        // Nothing to do here.
+                        break;
 
-                case ConnectionState.Connected:
-                    Console.WriteLine("Successfully connected to server!\nTo change your name, type /name <your new name>.");
-                    break;
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
+                        Console.WriteLine("Successfully connected to server!\nTo change your name, type /name <your new name>.");
+                        break;
 
-                case ConnectionState.ClosedByPeer:
-                case ConnectionState.ProblemDetectedLocally:
-                    // Print the reason of connection close
-                    ConnectionInfo connInfo = info.connectionInfo;
-                    string state = connInfo.state == ConnectionState.ClosedByPeer ? "closed by peer" : "problem detected locally";
-                    Console.WriteLine($"{connInfo.connectionDescription} ({state}), reason {connInfo.endReason}: {connInfo.endDebug}");
-                    cancelTokenSrc.Cancel();
-                    break;
-            }
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
+                        // Print the reason of connection close
+                        SteamNetConnectionInfo connInfo = info.m_info;
+
+                        string? desc, dbg;
+                        string state = connInfo.m_eState == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer ? "closed by peer" : "problem detected locally";
+                        unsafe
+                        {
+                            desc = Marshal.PtrToStringAnsi((nint)connInfo.m_szConnectionDescription);
+                            dbg = Marshal.PtrToStringAnsi((nint)connInfo.m_szEndDebug);
+                        }
+
+                        Console.WriteLine($"{desc ?? "(Invalid desc)"} ({state}), reason {connInfo.m_eEndReason}: {dbg ?? "(Invalid dbg)"}");
+                        cancelTokenSrc.Cancel();
+                        break;
+                }
+            };
         }
 
-        var clientConfigs = new Valve.Sockets.Configuration[1];
-        clientConfigs[0].SetConnectionStatusChangedCallback(OnConnectionStatusChanged);
+        Span<SteamNetworkingConfigValue> clientConfigs = stackalloc SteamNetworkingConfigValue[1];
+        unsafe
+        {
+            clientConfigs[0].SetPtr(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)Marshal.GetFunctionPointerForDelegate(onConnStatsChanged));
+        }
 
         // Connect to server
-        uint connection = client.Connect(ref address, clientConfigs);
+        uint connection = client.ConnectByIPAddress(address, clientConfigs.Length, clientConfigs);
 
-        void OnMessage(in NetworkingMessage netMsg)
+        void OnMessage(in SteamNetworkingMessage netMsg)
         {
             // Ignore the empty message.
             // In this case, `netMsg.data` is nullptr
-            if (netMsg.length == 0)
+            if (netMsg.m_cbSize == 0)
             {
                 Console.WriteLine("Server sent an empty message");
                 return;
@@ -123,7 +145,7 @@ internal class ChatClient
             ChatProtocol msg;
             unsafe
             {
-                ReadOnlySpan<byte> msgRaw = new((void*)netMsg.data, netMsg.length);
+                ReadOnlySpan<byte> msgRaw = new((void*)netMsg.m_pData, netMsg.m_cbSize);
                 msg = ProtoBuf.Serializer.Deserialize<ChatProtocol>(msgRaw);
             }
 
@@ -145,10 +167,32 @@ internal class ChatClient
         // Receive loop
         Task receiveTask = Task.Run(() =>
         {
+            Span<IntPtr> nativeMsgs = stackalloc IntPtr[MaxMessagePerReceive];
+
             while (!cancelToken.IsCancellationRequested)
             {
                 client.RunCallbacks();
-                client.ReceiveMessagesOnConnection(connection, OnMessage, MaxMessagePerReceive);
+                int receivedMsgCount = client.ReceiveMessagesOnConnection(connection, nativeMsgs, MaxMessagePerReceive);
+                if (receivedMsgCount == -1)
+                {
+                    throw new Exception($"receive msg failed");
+                }
+                else
+                {
+                    for (int i = 0; i < receivedMsgCount; ++i)
+                    {
+                        Span<SteamNetworkingMessage> message;
+                        unsafe
+                        {
+                            message = new Span<SteamNetworkingMessage>((void*)nativeMsgs[i], 1);
+                        }
+
+                        OnMessage(in message[0]);
+
+                        SteamNetworkingMessage.Release(nativeMsgs[i]);
+                    }
+                }
+
                 Thread.Sleep(1);
             }
         });
@@ -208,7 +252,7 @@ internal class ChatClient
             ProtoBuf.Serializer.Serialize(msgMS, msg);
 
             // Send the message
-            client.SendMessageToConnection(connection, msgMS.GetBuffer(), Convert.ToInt32(msgMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
+            client.SendMessageToConnection(connection, msgMS.GetBuffer(), Convert.ToUInt32(msgMS.Position), Native.k_nSteamNetworkingSend_ReliableNoNagle, out Unsafe.NullRef<long>());
         }
 
         Console.WriteLine("Quiting...");
@@ -221,9 +265,6 @@ internal class ChatClient
 
         // Wait for the linger for a short period of time
         Thread.Sleep(500);
-
-        // Destroy `ValveSockets-CSharp`
-        Valve.Sockets.Library.Deinitialize();
 
         Console.WriteLine("Quited!");
     }

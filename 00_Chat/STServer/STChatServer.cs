@@ -3,6 +3,7 @@
 namespace GNSPrac.Chat;
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ internal class STChatServer
     private static async Task Main(string[] args)
     {
         Console.WriteLine("GNS-Practice #00: Chat");
-        Console.WriteLine("Single-threaded chat server in C# with ValveSocket-CSharp");
+        Console.WriteLine("Single-threaded chat server in C# with Valve.Sockets.AutoGen");
         Console.WriteLine();
 
         // Parse port from `args`
@@ -42,7 +43,11 @@ internal class STChatServer
         try
         {
             // Load native `GameNetworkingSockets.dll` and its dependencies
-            NativeLibrary.Load(Path.Join(AppContext.BaseDirectory, "GameNetworkingSockets.dll"));
+            nint result = NativeLibrary.Load(Path.Join(AppContext.BaseDirectory, "GameNetworkingSockets.dll"));
+            if (result == IntPtr.Zero)
+            {
+                throw new Exception("Load returned nullptr");
+            }
         }
         catch (Exception ex)
         {
@@ -51,15 +56,20 @@ internal class STChatServer
             return;
         }
 
-        // Initialize `ValveSockets-CSharp`
-        if (!Valve.Sockets.Library.Initialize())
+        // Initialize `Valve.Sockets.AutoGen`
+        GameNetworkingSockets gns;
+        try
         {
-            Console.WriteLine("Failed to initialize ValveSocket-CSharp");
+            gns = new GameNetworkingSockets();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
             return;
         }
 
         // Prepare listen socket & poll group
-        NetworkingSockets server = new();
+        SteamNetworkingSockets server = new();
         uint pollGroup = server.CreatePollGroup();
 
         // Manage connected clients' info with a dictionary.
@@ -67,95 +77,113 @@ internal class STChatServer
         Dictionary<uint, ClientInfo> clients = [];
 
         // The connection status changed callback method
-        void OnConnectionStatusChanged(ref ConnectionStatusChangedInfo info)
+        FnSteamNetConnectionStatusChanged onConnectionStatusChanged;
+
+        unsafe
         {
-            switch (info.connectionInfo.state)
+            onConnectionStatusChanged = (ref SteamNetConnectionStatusChangedCallback info) =>
             {
-                case ConnectionState.None:
-                    // This is when you destroy the connection.
-                    // Nothing to do here.
-                    break;
-
-                case ConnectionState.Connecting:
-                    // Accept the connection.
-                    // You could also close the connection right away.
-                    Result acceptResult = server.AcceptConnection(info.connection);
-
-                    // If accept failed, clean up the connection.
-                    if (acceptResult != Result.OK)
-                    {
-                        server.CloseConnection(info.connection);
-                        Console.WriteLine($"Accept failed with {acceptResult}");
+                switch (info.m_info.m_eState)
+                {
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_None:
+                        // This is when you destroy the connection.
+                        // Nothing to do here.
                         break;
-                    }
 
-                    // Add new client to `clients` dictionary
-                    // It doesn't have a name yet, which means it's not properly logged in.
-                    //
-                    // Note that we do this BEFORE assign it to the poll group.
-                    // If we do the opposite, and if the message callback runs on a seperate thread,
-                    // it might not find this client from `clients` dictionary, because it's not added at that point.
-                    //
-                    // But actually, it's a single-threaded code now, so it doesn't matter for now.
-                    ClientInfo newClientInfo = new();
-                    clients.Add(info.connection, newClientInfo);
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting:
+                        // Accept the connection.
+                        // You could also close the connection right away.
+                        EResult acceptResult = server.AcceptConnection(info.m_hConn);
 
-                    // Assign new client to the poll group
-                    if (!server.SetConnectionPollGroup(pollGroup, info.connection))
-                    {
-                        clients.Remove(info.connection);
-                        server.CloseConnection(info.connection);
+                        // If accept failed, clean up the connection.
+                        if (acceptResult != EResult.k_EResultOK)
+                        {
+                            server.CloseConnection(info.m_hConn, 0, string.Empty, false);
+                            Console.WriteLine($"Accept failed with {acceptResult}");
+                            break;
+                        }
 
-                        Console.WriteLine($"Failed to assign poll group");
-                    }
+                        // Add new client to `clients` dictionary
+                        // It doesn't have a name yet, which means it's not properly logged in.
+                        //
+                        // Note that we do this BEFORE assign it to the poll group.
+                        // If we do the opposite, and if the message callback runs on a seperate thread,
+                        // it might not find this client from `clients` dictionary, because it's not added at that point.
+                        //
+                        // But actually, it's a single-threaded code now, so it doesn't matter for now.
+                        ClientInfo newClientInfo = new();
+                        clients.Add(info.m_hConn, newClientInfo);
 
-                    Console.WriteLine($"New client #{info.connection} connected!");
+                        // Assign new client to the poll group
+                        if (!server.SetConnectionPollGroup(info.m_hConn, pollGroup))
+                        {
+                            clients.Remove(info.m_hConn);
+                            server.CloseConnection(info.m_hConn, 0, string.Empty, false);
 
-                    break;
+                            Console.WriteLine($"Failed to assign poll group");
+                        }
 
-                case ConnectionState.ClosedByPeer:
-                case ConnectionState.ProblemDetectedLocally:
-                    // Connection changed callbacks are dispatched in FIFO order.
+                        Console.WriteLine($"New client #{info.m_hConn} connected!");
 
-                    // Get the client from `clients`
-                    ClientInfo client = clients[info.connection];
+                        break;
 
-                    // Print the reason of connection close
-                    ConnectionInfo connInfo = info.connectionInfo;
-                    string clientName = client.Name ?? "(not logged-in client)";
-                    string state = connInfo.state == ConnectionState.ClosedByPeer ? "closed by peer" : "problem detected locally";
-                    Console.WriteLine($"{clientName} ({connInfo.address}) {connInfo.connectionDescription} ({state}), reason {connInfo.endReason}: {connInfo.endDebug}");
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer:
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally:
+                        // Connection changed callbacks are dispatched in FIFO order.
 
-                    // Remove it from the clients dictionary
-                    clients.Remove(info.connection);
+                        // Get the client from `clients`
+                        ClientInfo client = clients[info.m_hConn];
 
-                    // Don't forget to clean up the connection!
-                    server.CloseConnection(info.connection);
+                        // Print the reason of connection close
+                        SteamNetConnectionInfo connInfo = info.m_info;
+                        string clientName = client.Name ?? "(not logged-in client)";
+                        string state = connInfo.m_eState == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer ? "closed by peer" : "problem detected locally";
+                        string? desc, dbg;
+                        unsafe
+                        {
+                            desc = Marshal.PtrToStringAnsi((nint)connInfo.m_szConnectionDescription);
+                            dbg = Marshal.PtrToStringAnsi((nint)connInfo.m_szEndDebug);
+                        }
 
-                    break;
+                        Console.WriteLine($"{clientName} ({connInfo.m_addrRemote}) {desc ?? "(Invalid desc)"} ({state}), reason {connInfo.m_eEndReason}: {dbg ?? "(Invalid dbg)"}");
 
-                case ConnectionState.Connected:
-                    // Callback after accepting the connection.
-                    // Nothing to do here, as we're the server.
-                    break;
-            }
+                        // Remove it from the clients dictionary
+                        clients.Remove(info.m_hConn);
+
+                        // Don't forget to clean up the connection!
+                        server.CloseConnection(info.m_hConn, 0, string.Empty, false);
+
+                        break;
+
+                    case ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected:
+                        // Callback after accepting the connection.
+                        // Nothing to do here, as we're the server.
+                        break;
+                }
+            };
         }
 
         // Setup configuration used for listen socket
-        var listenSocketConfigs = new Valve.Sockets.Configuration[1];
-        listenSocketConfigs[0].SetConnectionStatusChangedCallback(OnConnectionStatusChanged);
+        Span<SteamNetworkingConfigValue> configs = stackalloc SteamNetworkingConfigValue[1];
+        unsafe
+        {
+            configs[0].SetPtr(ESteamNetworkingConfigValue.k_ESteamNetworkingConfig_Callback_ConnectionStatusChanged, (void*)Marshal.GetFunctionPointerForDelegate(onConnectionStatusChanged));
+        }
 
         // Start listening
-        Address addr = default;
-        addr.SetAddress("::", port);
-        uint listenSocket = server.CreateListenSocket(ref addr, listenSocketConfigs);
+        SteamNetworkingIPAddr addr = default;
+        addr.Clear();
+        addr.m_port = DefaultServerPort;
+        uint listenSocket = server.CreateListenSocketIP(addr, configs.Length, configs);
+
+        Console.WriteLine($"listenSocket = {listenSocket}");
 
         // The message callback method
-        void OnMessage(in NetworkingMessage netMsg)
+        void OnMessage(in SteamNetworkingMessage netMsg)
         {
             // Ignore the empty message.
             // In this case, `netMsg.data` is nullptr
-            if (netMsg.length == 0)
+            if (netMsg.m_cbSize == 0)
             {
                 Console.WriteLine("Client sent an empty message");
                 return;
@@ -165,13 +193,13 @@ internal class STChatServer
             ChatProtocol msg;
             unsafe
             {
-                ReadOnlySpan<byte> msgRaw = new((void*)netMsg.data, netMsg.length);
+                ReadOnlySpan<byte> msgRaw = new((void*)netMsg.m_pData, netMsg.m_cbSize);
                 msg = ProtoBuf.Serializer.Deserialize<ChatProtocol>(msgRaw);
             }
 
             // Get the client from `clients` dictionary.
             // It must exist in the dictionary, because we added it on `ConnectionState.Connecting`
-            ClientInfo client = clients[netMsg.connection];
+            ClientInfo client = clients[netMsg.m_conn];
 
             // Handle the message based on its type
             switch (msg.Type)
@@ -184,7 +212,7 @@ internal class STChatServer
                             Type = ChatProtocol.MsgType.MsgTypeChat,
                             Chat = new()
                             {
-                                SenderName = client.Name ?? $"Guest#{netMsg.connection}",
+                                SenderName = client.Name ?? $"Guest#{netMsg.m_conn}",
                                 Content = msg.Chat.Content,
                             },
                         };
@@ -198,9 +226,9 @@ internal class STChatServer
                         foreach (var otherClientConn in clients.Keys)
                         {
                             // Ignore itself
-                            if (otherClientConn != netMsg.connection)
+                            if (otherClientConn != netMsg.m_conn)
                             {
-                                server.SendMessageToConnection(otherClientConn, responseMS.GetBuffer(), Convert.ToInt32(responseMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
+                                server.SendMessageToConnection(otherClientConn, responseMS.GetBuffer(), Convert.ToUInt32(responseMS.Position), Native.k_nSteamNetworkingSend_ReliableNoNagle, out Unsafe.NullRef<long>());
                             }
                         }
 
@@ -215,7 +243,7 @@ internal class STChatServer
                         if (msg.NameChange.Name != null)
                         {
                             client.Name = msg.NameChange.Name;
-                            Console.WriteLine($"Client #{netMsg.connection} changed their name to {client.Name}");
+                            Console.WriteLine($"Client #{netMsg.m_conn} changed their name to {client.Name}");
                         }
 
                         // Prepare the response to the client about their current name
@@ -225,7 +253,7 @@ internal class STChatServer
                             Chat = new()
                             {
                                 SenderName = "Server",
-                                Content = $"Your name is now {client.Name ?? $"Guest#{netMsg.connection}"}",
+                                Content = $"Your name is now {client.Name ?? $"Guest#{netMsg.m_conn}"}",
                             },
                         };
 
@@ -235,7 +263,7 @@ internal class STChatServer
                         ProtoBuf.Serializer.Serialize(responseMS, response);
 
                         // Notify to the client about their current name
-                        server.SendMessageToConnection(netMsg.connection, responseMS.GetBuffer(), Convert.ToInt32(responseMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
+                        server.SendMessageToConnection(netMsg.m_conn, responseMS.GetBuffer(), Convert.ToUInt32(responseMS.Position), Native.k_nSteamNetworkingSend_ReliableNoNagle, out Unsafe.NullRef<long>());
                         break;
                     }
 
@@ -253,10 +281,32 @@ internal class STChatServer
         // Receive loop
         Task receiveTask = Task.Run(() =>
         {
+            Span<IntPtr> nativeMsgs = stackalloc IntPtr[MaxMessagePerReceive];
+
             while (!cancelToken.IsCancellationRequested)
             {
                 server.RunCallbacks();
-                server.ReceiveMessagesOnPollGroup(pollGroup, OnMessage, MaxMessagePerReceive);
+                int receivedMsgCount = server.ReceiveMessagesOnPollGroup(pollGroup, nativeMsgs, MaxMessagePerReceive);
+                if (receivedMsgCount == -1)
+                {
+                    throw new Exception($"receive msg failed");
+                }
+                else
+                {
+                    for (int i = 0; i < receivedMsgCount; ++i)
+                    {
+                        Span<SteamNetworkingMessage> message;
+                        unsafe
+                        {
+                            message = new Span<SteamNetworkingMessage>((void*)nativeMsgs[i], 1);
+                        }
+
+                        OnMessage(in message[0]);
+
+                        SteamNetworkingMessage.Release(nativeMsgs[i]);
+                    }
+                }
+
                 Thread.Sleep(1);
             }
         });
@@ -303,7 +353,7 @@ internal class STChatServer
         foreach (uint clientConn in clients.Keys)
         {
             // Send the final message
-            server.SendMessageToConnection(clientConn, finalMsgMS.GetBuffer(), Convert.ToInt32(finalMsgMS.Position), SendFlags.Reliable | SendFlags.NoNagle);
+            server.SendMessageToConnection(clientConn, finalMsgMS.GetBuffer(), Convert.ToUInt32(finalMsgMS.Position), Native.k_nSteamNetworkingSend_ReliableNoNagle, out Unsafe.NullRef<long>());
 
             // Close the connection with linger enabled
             server.CloseConnection(clientConn, 0, "Server shutdown", true);
@@ -322,9 +372,6 @@ internal class STChatServer
 
         // This should be AFTER wait, because closing listen socket destroys all connections accepted from it
         server.CloseListenSocket(listenSocket);
-
-        // Destroy `ValveSockets-CSharp`
-        Valve.Sockets.Library.Deinitialize();
 
         Console.WriteLine("Server closed!");
     }
