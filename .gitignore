@@ -8,6 +8,8 @@ build*/
 out*/
 [Bb]in/
 [Oo]bj/
+*.pb.cc
+*.pb.h
 
 # CMake
 CMakeUserPresets.json

@@ -1,3 +1,3 @@
 
 add_executable(st_chat_client st_chat_client.cpp)
-target_link_libraries(st_chat_client GameNetworkingSockets::shared)
+target_link_libraries(st_chat_client GameNetworkingSockets::static)
