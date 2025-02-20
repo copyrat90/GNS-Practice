@@ -8,6 +8,11 @@ Currently, only supports building on Windows with MSVC & on Linux with GCC.
 
 1. Build GameNetworkingSockets and my C++ examples first with CMake and Ninja (single-config), on the `build/` directory.
     * Refer to the [`BUILDING.md`](https://github.com/ValveSoftware/GameNetworkingSockets/blob/master/BUILDING.md) on GameNetworkingSockets for details.
+        * If you're using *Developer Powershell for VS 2022* on Windows, do note that it defaults to x86 environment, which obviously doesn't work.\
+          You need to switch to AMD64 environment manually with following:
+          ```powershell
+          Enter-VsDevShell -DevCmdArguments "-arch=x64 -host_arch=x64" -VsInstallPath "C:/Program Files/Microsoft Visual Studio/2022/Community" -SkipAutomaticLocation
+          ```
     * It would be handy to create your own configuration preset in `CMakeUserPresets.json`,\
       inheriting from a preset in the [`CMakePresets.json`](CMakePresets.json). e.g:
         ```json
