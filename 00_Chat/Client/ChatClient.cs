@@ -69,6 +69,12 @@ internal class ChatClient : IAsyncDisposable, IDisposable
     /// <returns>Task that represents connection request. Note that returning `true` means request succeed, not connected.</returns>
     public async Task<bool> Connect(string hostNameOrAddress, ushort hostPort)
     {
+        // Prevent connecting twice
+        if (!this.disposed)
+        {
+            return false;
+        }
+
         this.disposed = false;
         GC.ReRegisterForFinalize(this);
 
@@ -138,7 +144,7 @@ internal class ChatClient : IAsyncDisposable, IDisposable
             Console.WriteLine("Failed to connect to server: " + ex.Message);
             Console.WriteLine(ex.StackTrace);
 
-            this.Dispose(true);
+            this.Dispose();
 
             return false;
         }

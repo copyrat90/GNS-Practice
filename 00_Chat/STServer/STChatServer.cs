@@ -73,6 +73,12 @@ public class STChatServer : IAsyncDisposable, IDisposable
     /// <returns>Whether the server has been started to run, or errored.</returns>
     public bool Start(ushort port)
     {
+        // Prevent starting twice
+        if (!this.disposed)
+        {
+            return false;
+        }
+
         this.disposed = false;
         GC.ReRegisterForFinalize(this);
 
@@ -142,7 +148,7 @@ public class STChatServer : IAsyncDisposable, IDisposable
             Console.WriteLine("Failed to start STChatServer: " + ex.Message);
             Console.WriteLine(ex.StackTrace);
 
-            this.Dispose(true);
+            this.Dispose();
 
             return false;
         }
