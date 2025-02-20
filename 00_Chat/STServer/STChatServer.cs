@@ -431,7 +431,7 @@ public class STChatServer : IAsyncDisposable, IDisposable
                         message = new Span<SteamNetworkingMessage>((void*)nativeMsgs[i], 1);
                     }
 
-                    this.OnMessage(in message[0]);
+                    this.MessageReceived!.Invoke(in message[0]);
 
                     SteamNetworkingMessage.Release(nativeMsgs[i]);
                 }

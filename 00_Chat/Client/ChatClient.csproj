@@ -32,7 +32,7 @@
     </Content>
   </ItemGroup>
 
-  <!-- Valve.Sockets.AutoGen -->
+  <!-- Valve.Sockets.Regen -->
   <ItemGroup>
     <ProjectReference Include="../../Valve.Sockets.Regen/Valve.Sockets/Valve.Sockets.csproj" />
   </ItemGroup>

@@ -111,7 +111,7 @@ internal class ChatClient : IAsyncDisposable, IDisposable
             this.netSockets = new SteamNetworkingSockets();
 
             // Setup the connection status changed callback delegate instance.
-            // This delegate instance should live until the server is closed, because it's called from native dll.
+            // This delegate instance should live until the connection is closed, because it's called from native dll.
             this.ConnectionStatusChanged = new(this.OnConnectionStatusChanged);
 
             // Setup configuration used for connection
@@ -125,7 +125,7 @@ internal class ChatClient : IAsyncDisposable, IDisposable
             this.connection = this.netSockets.ConnectByIPAddress(address, configs.Length, configs);
 
             // Setup the on message callback delegate instance.
-            // This delegate instance should live until the server is closed, because it's called from native dll.
+            // This delegate instance should live until the connection is closed, because it's called from native dll.
             this.MessageReceived = new(this.OnMessage);
 
             // Create the client loop as a task
@@ -150,7 +150,7 @@ internal class ChatClient : IAsyncDisposable, IDisposable
     /// Stop the client.
     /// </summary>
     /// <param name="lingerMilliseconds">Milliseconds to wait before dropping connections. This can be useful if you want to send a goodbye message or similar.</param>
-    /// <returns>ValueTask stopping the server.</returns>
+    /// <returns>ValueTask stopping the client.</returns>
     public async ValueTask Stop(int lingerMilliseconds = 0)
     {
         if (this.disposed)
@@ -182,7 +182,7 @@ internal class ChatClient : IAsyncDisposable, IDisposable
     /// Disposes the client asynchronously.
     /// If it was not stopped, it will be stopped asynchronously.
     /// </summary>
-    /// <returns>ValueTask stopping the server.</returns>
+    /// <returns>ValueTask stopping the client.</returns>
     public async ValueTask DisposeAsync()
     {
         // Cleanup managed resources (async)
@@ -420,7 +420,7 @@ internal class ChatClient : IAsyncDisposable, IDisposable
                         message = new Span<SteamNetworkingMessage>((void*)nativeMsgs[i], 1);
                     }
 
-                    this.OnMessage(in message[0]);
+                    this.MessageReceived!.Invoke(in message[0]);
 
                     SteamNetworkingMessage.Release(nativeMsgs[i]);
                 }
