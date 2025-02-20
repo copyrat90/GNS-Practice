@@ -1,8 +1,8 @@
 # GNS-Practice
 
-My practices on using [GameNetworkingSockets](https://github.com/ValveSoftware/GameNetworkingSockets), along with my fork of [ValveSockets-CSharp](https://github.com/copyrat90/ValveSockets-CSharp).
+My practices on using [GameNetworkingSockets](https://github.com/ValveSoftware/GameNetworkingSockets), along with [my fork of Valve.Sockets.Autogen](https://github.com/copyrat90/Valve.Sockets.Regen).
 
-Currently, only supports building on Windows with MSVC.
+Currently, only supports building on Windows with MSVC & on Linux with GCC.
 
 ## Build
 
@@ -25,5 +25,5 @@ Currently, only supports building on Windows with MSVC.
         }
         ```
 1. Build my C# projects afterwards.
-    * As it relies on the native `GameNetworkingSockets.dll`, building it with C++ beforehand is a MUST;\
-      Otherwise, you'll get runtime error about missing dlls.
+    * As it relies on the native dynamic libraries, building it with C++ beforehand is a MUST;\
+      Otherwise, you'll get runtime error about missing dynamic libraries.

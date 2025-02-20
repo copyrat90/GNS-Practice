@@ -34,7 +34,7 @@
 
   <!-- Valve.Sockets.AutoGen -->
   <ItemGroup>
-    <ProjectReference Include="../../ValveSockets-CSharp/Valve.Sockets/Valve.Sockets.csproj" />
+    <ProjectReference Include="../../Valve.Sockets.Regen/Valve.Sockets/Valve.Sockets.csproj" />
   </ItemGroup>
 
 </Project>
