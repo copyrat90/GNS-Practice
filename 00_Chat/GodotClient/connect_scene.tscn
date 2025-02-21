@@ -1,0 +1,64 @@
+[gd_scene load_steps=2 format=3 uid="uid://rogwdnq15p1n"]
+
+[ext_resource type="Script" path="res://ConnectScene.cs" id="1_o5e5s"]
+
+[node name="ConnectScene" type="CenterContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_o5e5s")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Host address: "
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="AddrEdit" type="LineEdit" parent="VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer2"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Host port: "
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="PortEdit" type="LineEdit" parent="VBoxContainer/HBoxContainer2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+
+[node name="HBoxContainer3" type="CenterContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="ConnectButton" type="Button" parent="VBoxContainer/HBoxContainer3"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+text = "Connect!"
+
+[node name="ProgressBar" type="ProgressBar" parent="VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+show_percentage = false
+
+[node name="Description" type="Label" parent="VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2

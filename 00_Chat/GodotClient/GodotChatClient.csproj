@@ -1,0 +1,35 @@
+<Project Sdk="Godot.NET.Sdk/4.3.0">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="protobuf-net" Version="3.2.46" />
+    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <AdditionalFiles Include="../../stylecop.json" />
+  </ItemGroup>
+
+  <!-- ProtoBuf -->
+  <ItemGroup>
+    <Compile Include="../Proto/*.cs" />
+  </ItemGroup>
+
+  <!-- GameNetworkingSockets -->
+  <ItemGroup>
+    <Content Include="../../build/bin/GameNetworkingSockets.dll;../../build/bin/abseil_dll.dll;../../build/bin/libcrypto-3-x64.dll;../../build/bin/libprotobuf.dll" Condition=" '$(OS)' == 'Windows_NT' ">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="../../build/bin/libGameNetworkingSockets.so" Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Valve.Sockets.Regen -->
+  <ItemGroup>
+    <ProjectReference Include="../../Valve.Sockets.Regen/Valve.Sockets/Valve.Sockets.csproj" />
+  </ItemGroup>
+</Project>
