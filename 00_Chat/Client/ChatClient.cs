@@ -462,8 +462,8 @@ internal class ChatClient : IAsyncDisposable, IDisposable
                 string state = connInfo.m_eState == ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer ? "closed by peer" : "problem detected locally";
                 unsafe
                 {
-                    desc = Marshal.PtrToStringAnsi((nint)connInfo.m_szConnectionDescription);
-                    dbg = Marshal.PtrToStringAnsi((nint)connInfo.m_szEndDebug);
+                    desc = Marshal.PtrToStringUTF8((nint)connInfo.m_szConnectionDescription);
+                    dbg = Marshal.PtrToStringUTF8((nint)connInfo.m_szEndDebug);
                 }
 
                 Console.WriteLine($"{desc ?? "(Invalid desc)"} ({state}), reason {connInfo.m_eEndReason}: {dbg ?? "(Invalid dbg)"}");

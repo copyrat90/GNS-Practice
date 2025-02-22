@@ -512,8 +512,8 @@ public class STChatServer : IAsyncDisposable, IDisposable
                 string? desc, dbg;
                 unsafe
                 {
-                    desc = Marshal.PtrToStringAnsi((nint)connInfo.m_szConnectionDescription);
-                    dbg = Marshal.PtrToStringAnsi((nint)connInfo.m_szEndDebug);
+                    desc = Marshal.PtrToStringUTF8((nint)connInfo.m_szConnectionDescription);
+                    dbg = Marshal.PtrToStringUTF8((nint)connInfo.m_szEndDebug);
                 }
 
                 Console.WriteLine($"{clientName} ({connInfo.m_addrRemote}) {desc ?? "(Invalid desc)"} ({state}), reason {connInfo.m_eEndReason}: {dbg ?? "(Invalid dbg)"}");
