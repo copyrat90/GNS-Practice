@@ -370,7 +370,6 @@ internal class ChatClient : IAsyncDisposable, IDisposable
                     string newName = string.Join(' ', split[1..]);
                     msg = new()
                     {
-                        Type = ChatProtocol.MsgType.MsgTypeNameChange,
                         NameChange = new() { Name = newName },
                     };
                 }
@@ -382,7 +381,6 @@ internal class ChatClient : IAsyncDisposable, IDisposable
                 // Prepare chat message
                 msg = new()
                 {
-                    Type = ChatProtocol.MsgType.MsgTypeChat,
                     Chat = new() { Content = message },
                 };
             }
@@ -495,16 +493,16 @@ internal class ChatClient : IAsyncDisposable, IDisposable
         }
 
         // Handle the message based on its type
-        switch (msg.Type)
+        switch (msg.MsgCase)
         {
-            case ChatProtocol.MsgType.MsgTypeChat:
+            case ChatProtocol.MsgOneofCase.Chat:
                 // Print the chat message
                 Console.WriteLine($"{msg.Chat.SenderName ?? "???"}: {msg.Chat.Content ?? string.Empty}");
                 break;
 
             default:
                 // Server shouldn't send other type of messages
-                Console.WriteLine($"Server sent an invalid message type: {msg.Type}");
+                Console.WriteLine($"Server sent an invalid message type: {msg.MsgCase}");
                 break;
         }
     }

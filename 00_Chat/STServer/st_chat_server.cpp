@@ -325,15 +325,14 @@ private:
         client_info& client = _clients[net_msg.m_conn];
 
         // Handle the message based on its type
-        switch (msg.type())
+        switch (msg.msg_case())
         {
-            using msg_type = GNSPrac::Chat::ChatProtocol_MsgType;
+            using msg_case = GNSPrac::Chat::ChatProtocol::MsgCase;
 
-        case msg_type::ChatProtocol_MsgType_MSG_TYPE_CHAT: {
+        case msg_case::kChat: {
             // We could reuse the same `msg`, but we'll just create another one to demonstrate.
             // I'm omitting checks for simplicity, but you should always validate a client message.
             GNSPrac::Chat::ChatProtocol response;
-            response.set_type(msg_type::ChatProtocol_MsgType_MSG_TYPE_CHAT);
             auto& chat = *response.mutable_chat();
             *chat.mutable_sender_name() = client.name.empty() ? std::format("Guest#{}", net_msg.m_conn) : client.name;
             *chat.mutable_content() = msg.chat().content();
@@ -362,7 +361,7 @@ private:
             break;
         }
 
-        case msg_type::ChatProtocol_MsgType_MSG_TYPE_NAME_CHANGE: {
+        case msg_case::kNameChange: {
             // Set the new name if not null
             if (msg.has_name_change() && !msg.name_change().name().empty())
             {
@@ -373,7 +372,6 @@ private:
 
             // Prepare the response to the client about their current name
             GNSPrac::Chat::ChatProtocol response;
-            response.set_type(msg_type::ChatProtocol_MsgType_MSG_TYPE_CHAT);
             auto& chat = *response.mutable_chat();
             *chat.mutable_sender_name() = "Server";
             *chat.mutable_content() = std::format(
@@ -393,7 +391,7 @@ private:
 
         default:
             // Client shouldn't send other type of messages
-            std::cout << std::format("Client sent an invalid message type: {}", (int)msg.type()) << std::endl;
+            std::cout << std::format("Client sent an invalid message type: {}", (int)msg.msg_case()) << std::endl;
             break;
         }
     }

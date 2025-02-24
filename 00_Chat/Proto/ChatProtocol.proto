@@ -3,17 +3,9 @@ syntax = "proto3";
 package GNSPrac.Chat;
 
 message ChatProtocol {
-    MsgType type = 1;
-
     oneof msg {
-        NameChange name_change = 2;
-        Chat chat = 3;
-    }
-
-    enum MsgType {
-        MSG_TYPE_UNSPECIFIED = 0;
-        MSG_TYPE_NAME_CHANGE = 1;
-        MSG_TYPE_CHAT = 2;
+        NameChange name_change = 1;
+        Chat chat = 2;
     }
 }
 

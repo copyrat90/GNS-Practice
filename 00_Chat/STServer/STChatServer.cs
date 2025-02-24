@@ -389,7 +389,6 @@ public class STChatServer : IAsyncDisposable, IDisposable
         // Prepare the final message from the server
         ChatProtocol finalMsg = new()
         {
-            Type = ChatProtocol.MsgType.MsgTypeChat,
             Chat = new()
             {
                 SenderName = "Server",
@@ -560,14 +559,13 @@ public class STChatServer : IAsyncDisposable, IDisposable
         ClientInfo client = this.clients![netMsg.m_conn];
 
         // Handle the message based on its type
-        switch (msg.Type)
+        switch (msg.MsgCase)
         {
-            case ChatProtocol.MsgType.MsgTypeChat:
+            case ChatProtocol.MsgOneofCase.Chat:
                 {
                     // We could reuse the same `msg`, but we'll just create another one to demonstrate.
                     ChatProtocol response = new()
                     {
-                        Type = ChatProtocol.MsgType.MsgTypeChat,
                         Chat = new()
                         {
                             SenderName = client.Name ?? $"Guest#{netMsg.m_conn}",
@@ -595,7 +593,7 @@ public class STChatServer : IAsyncDisposable, IDisposable
                     break;
                 }
 
-            case ChatProtocol.MsgType.MsgTypeNameChange:
+            case ChatProtocol.MsgOneofCase.NameChange:
                 {
                     // Set the new name if not null
                     if (msg.NameChange.Name != null)
@@ -607,7 +605,6 @@ public class STChatServer : IAsyncDisposable, IDisposable
                     // Prepare the response to the client about their current name
                     ChatProtocol response = new()
                     {
-                        Type = ChatProtocol.MsgType.MsgTypeChat,
                         Chat = new()
                         {
                             SenderName = "Server",
@@ -627,7 +624,7 @@ public class STChatServer : IAsyncDisposable, IDisposable
 
             default:
                 // Client shouldn't send other type of messages
-                Console.WriteLine($"Client sent an invalid message type: {msg.Type}");
+                Console.WriteLine($"Client sent an invalid message type: {msg.MsgCase}");
                 break;
         }
     }

@@ -58,7 +58,6 @@ public partial class ChatScene : Control
                     string newName = string.Join(' ', split[1..]);
                     msg = new()
                     {
-                        Type = ChatProtocol.MsgType.MsgTypeNameChange,
                         NameChange = new() { Name = newName },
                     };
                 }
@@ -70,7 +69,6 @@ public partial class ChatScene : Control
                 // Prepare chat message
                 msg = new()
                 {
-                    Type = ChatProtocol.MsgType.MsgTypeChat,
                     Chat = new() { Content = message },
                 };
 
@@ -91,7 +89,7 @@ public partial class ChatScene : Control
 
     private void OnChatReceived(ChatProtocol chat)
     {
-        if (chat.Type == ChatProtocol.MsgType.MsgTypeChat)
+        if (chat.MsgCase == ChatProtocol.MsgOneofCase.Chat)
         {
             // Error on empty chat sent from server
             if (chat.Chat == null || chat.Chat.Content == null || chat.Chat.Content.Length == 0)
@@ -106,7 +104,7 @@ public partial class ChatScene : Control
         else
         {
             // Server shouldn't send other type of messages
-            GD.PushError($"Server sent an invalid message type: {chat.Type}");
+            GD.PushError($"Server sent an invalid message type: {chat.MsgCase}");
         }
     }
 
