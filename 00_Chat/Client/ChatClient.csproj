@@ -18,9 +18,13 @@
   </ItemGroup>
 
   <!-- ProtoBuf -->
-  <ItemGroup>
-    <Compile Include="../Proto/*.cs" />
-  </ItemGroup>
+  <Target Name="Protogen" BeforeTargets="BeforeBuild">
+    <Exec Command="dotnet tool restore" />
+    <Exec Command="dotnet tool run protogen --proto_path=../Proto *.proto --csharp_out=../Proto +oneof=enum" />
+    <ItemGroup>
+      <Compile Include="../Proto/*.cs" />
+    </ItemGroup>
+  </Target>
 
   <!-- GameNetworkingSockets -->
   <ItemGroup>

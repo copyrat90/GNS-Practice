@@ -8,8 +8,12 @@ build*/
 out*/
 [Bb]in/
 [Oo]bj/
-*.pb.cc
-*.pb.h
+
+# Protobuf generated sources
+**/Proto/*.pb.cc
+**/Proto/*.pb.h
+**/Proto/*.cs
+!**/Proto/ProtoCompat.cs
 
 # CMake
 CMakeUserPresets.json
