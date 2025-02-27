@@ -10,3 +10,4 @@ find_package(Protobuf REQUIRED)
 add_subdirectory(GameNetworkingSockets)
 
 add_subdirectory(00_Chat)
+add_subdirectory(01_SharedPayload)
